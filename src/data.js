@@ -1,0 +1,8 @@
+export const LABELS = ["Fleisch", "Fisch", "Vegetarisch", "Süßspeise", "Wochenende"];
+export const SEED = [
+  { $id:"demo-1", name:"Cremiges Hähnchen-Curry", category:"Hauptgericht", minutes:30, servings:2, ingredients:"300 g Hähnchenbrust\n150 g Reis\n1 Dose Kokosmilch\nCurrypaste und Gemüse", instructions:"Reis kochen. Hähnchen anbraten, Gemüse und Currypaste dazugeben. Mit Kokosmilch ablöschen und köcheln lassen.", labels:["Fleisch"], lastCooked:"2026-11-02" },
+  { $id:"demo-2", name:"Gemüse-Lasagne", category:"Hauptgericht", minutes:55, servings:4, ingredients:"Lasagneplatten\nZucchini\nAubergine\nTomatensauce\nBéchamel", instructions:"Gemüse anbraten. Mit Lasagneplatten und Saucen schichten. Bei 180 °C etwa 35 Minuten backen.", labels:["Vegetarisch"], lastCooked:"2026-10-28" },
+  { $id:"demo-3", name:"Lachs mit Ofenkartoffeln", category:"Hauptgericht", minutes:35, servings:2, ingredients:"2 Lachsfilets\n500 g Kartoffeln\nZitrone\nDill", instructions:"Kartoffeln würzen und im Ofen rösten. Lachs die letzten 12–15 Minuten mitgaren.", labels:["Fisch"], lastCooked:"2026-10-20" },
+  { $id:"demo-4", name:"Kaiserschmarrn", category:"Süßspeise", minutes:25, servings:2, ingredients:"3 Eier\n150 ml Milch\n120 g Mehl\n1 EL Zucker\nRosinen", instructions:"Teig anrühren, in Butter goldbraun backen, zerteilen und mit Puderzucker servieren.", labels:["Süßspeise","Wochenende"], lastCooked:"2026-10-12" },
+  { $id:"demo-5", name:"Spaghetti Bolognese", category:"Hauptgericht", minutes:40, servings:4, ingredients:"400 g Spaghetti\n300 g Hackfleisch\n1 Dose Tomaten\nZwiebel und Knoblauch", instructions:"Hackfleisch mit Zwiebel anbraten. Tomaten zugeben und köcheln lassen. Mit Spaghetti servieren.", labels:["Fleisch"], lastCooked:"2026-11-10" }
+];
