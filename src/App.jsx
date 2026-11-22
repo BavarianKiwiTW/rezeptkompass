@@ -14,7 +14,8 @@ const env = {
   recipes: import.meta.env.VITE_APPWRITE_RECIPES_COLLECTION_ID,
   plans: import.meta.env.VITE_APPWRITE_PLANS_COLLECTION_ID,
   history: import.meta.env.VITE_APPWRITE_HISTORY_COLLECTION_ID,
-  team: import.meta.env.VITE_APPWRITE_TEAM_ID
+  team: import.meta.env.VITE_APPWRITE_TEAM_ID,
+  labels: import.meta.env.VITE_APPWRITE_LABELS_COLLECTION_ID
 };
 
 // Alle sieben Werte müssen gesetzt sein, damit die App den Cloud-Modus verwendet.
@@ -39,6 +40,9 @@ function App() {
   const [recipes,setRecipes] = useState([]);
   const [plans,setPlans] = useState([]);
   const [history,setHistory] = useState([]);
+  const [labels,setLabels] = useState(LABELS);
+  const [labelInput,setLabelInput] = useState("");
+  const [labelsOpen,setLabelsOpen] = useState(false);
   const [filter,setFilter] = useState("Alle");
   const [search,setSearch] = useState("");
   const [week,setWeek] = useState(mondayOf(today));
@@ -80,14 +84,16 @@ function App() {
 
   async function loadCloud(){
     try {
-      const [r,p,h] = await Promise.all([
+      const [r,p,h,l] = await Promise.all([
         db.listRows({databaseId:env.db,tableId:env.recipes,queries:[Query.limit(100)]}),
         db.listRows({databaseId:env.db,tableId:env.plans,queries:[Query.limit(300)]}),
-        db.listRows({databaseId:env.db,tableId:env.history,queries:[Query.orderDesc("cookedAt"),Query.limit(300)]})
+        db.listRows({databaseId:env.db,tableId:env.history,queries:[Query.orderDesc("cookedAt"),Query.limit(300)]}),
+        db.listRows({databaseId:env.db,tableId:env.labels,queries:[Query.orderAsc("name"),Query.limit(100)]})
       ]);
       setRecipes((r.rows || []).map(row=>({...row,lastCooked:row.lastcooked || null})));
       setPlans(p.rows || []);
       setHistory(h.rows || []);
+      setLabels((l.rows || []).map(row => row.name).filter(Boolean));
     } catch(e){ setNotice("Daten konnten nicht geladen werden: "+e.message); }
   }
 
@@ -112,6 +118,34 @@ function App() {
       }
       setModal(false); setEditing(null); setNotice(editing?"Rezept aktualisiert":"Rezept gespeichert");
     } catch(e) { setNotice("Rezept konnte nicht gespeichert werden: "+e.message); }
+  };
+  const addLabel = async () => {
+    const name = labelInput.trim();
+    if (!name) return;
+
+    if (labels.some(l => l.toLowerCase() === name.toLowerCase())) {
+      setNotice("Dieses Label gibt es bereits.");
+      return;
+    }
+
+    try {
+      if (!demo) {
+        await db.createRow({
+          databaseId:env.db,
+          tableId:env.labels,
+          rowId:ID.unique(),
+          data:{name}
+        });
+        await loadCloud();
+      } else {
+        setLabels(v => [...v, name]);
+      }
+
+      setLabelInput("");
+      setNotice("Label hinzugefügt.");
+    } catch(e) {
+      setNotice("Label konnte nicht hinzugefügt werden: " + e.message);
+    }
   };
 
   const deleteRecipe = async recipe => {
@@ -198,7 +232,7 @@ function App() {
         {section==="recipes" && <>
           <div className="page-heading"><div><div className="eyebrow">DIE REZEPTSAMMLUNG</div><h1>Was kochen wir heute?</h1><p>Alle Lieblingsgerichte an einem Ort – gut sortiert und jederzeit griffbereit.</p></div><button className="btn btn-primary" onClick={openNew}><Plus size={18}/> Rezept hinzufügen</button></div>
           <div className="stats-row"><div className="stat"><span>GESAMTE REZEPTE</span><b>{recipes.length}</b></div><div className="stat"><span>KATEGORIEN</span><b>{new Set(recipes.flatMap(r=>r.labels||[])).size}</b></div><div className="stat"><span>IN DIESEM MONAT GEKOCHT</span><b>{history.filter(h=>h.cookedAt?.slice(0,7)===iso(today).slice(0,7)).length}</b></div></div>
-          <div className="toolbar"><div className="searchbox"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rezepte oder Zutaten suchen …"/></div><div className="filters"><button className={filter==="Alle"?"filter active-filter":"filter"} onClick={()=>setFilter("Alle")}>Alle</button>{LABELS.map(l=><button key={l} className={filter===l?"filter active-filter":"filter"} onClick={()=>setFilter(l)}>{l}</button>)}</div></div>
+          <div className="toolbar"><div className="searchbox"><Search size={17}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rezepte oder Zutaten suchen …"/></div><div className="filters"><button className={filter==="Alle"?"filter active-filter":"filter"} onClick={()=>setFilter("Alle")}>Alle</button>{labels.map(l=><button key={l} className={filter===l?"filter active-filter":"filter"} onClick={()=>setFilter(l)}>{l}</button>)}</div><button className="btn btn-light" onClick={()=>setLabelsOpen(true)}>Labels verwalten</button></div>
           <div className="section-caption"><b>{filtered.length} {filtered.length===1?"Rezept":"Rezepte"}</b><span>Nach Kategorie filtern</span></div>
           {filtered.length===0?<Empty title="Noch nichts gefunden" text="Passe deine Suche an oder füge ein neues Rezept hinzu."/>:
             <div className="recipe-grid">{filtered.map(r=><RecipeCard key={r.$id} recipe={r} onEdit={()=>openEdit(r)} onDelete={()=>deleteRecipe(r)}/>)}</div>}
@@ -219,7 +253,8 @@ function App() {
       </div>
     </main>
 
-    {modal && <RecipeModal form={form} setForm={setForm} editing={editing} onClose={()=>{setModal(false);setEditing(null)}} onSave={saveRecipe}/>}
+    {modal && <RecipeModal form={form} setForm={setForm} labels={labels} editing={editing} onClose={()=>{setModal(false);setEditing(null)}} onSave={saveRecipe}/>}
+    {labelsOpen && <div className="overlay" onMouseDown={e=>e.target===e.currentTarget&&setLabelsOpen(false)}><div className="recipe-modal"><div className="modal-head"><div><div className="eyebrow">VERWALTUNG</div><h2>Labels verwalten</h2></div><button className="close" onClick={()=>setLabelsOpen(false)}><X/></button></div><div className="form-scroll"><label>Neues Label<input value={labelInput} onChange={e=>setLabelInput(e.target.value)} placeholder="z. B. Schnell & einfach"/></label><button type="button" className="btn btn-primary" onClick={addLabel}>Label hinzufügen</button><div className="label-options">{labels.map(l=><span className="label-option selected" key={l}>{l}</span>)}</div></div></div></div>}
     {authOpen && cloudReady && <div className="overlay"><form className="auth-modal" onSubmit={signIn}><button type="button" className="close" onClick={()=>setAuthOpen(false)}><X/></button><div className="modal-icon"><ChefHat/></div><h2>{authMode==="login"?"Willkommen zurück":"Haushaltskonto erstellen"}</h2><p>Mit eurem Appwrite-Konto auf eure gemeinsame Rezeptsammlung zugreifen.</p><label>E-Mail-Adresse<input type="email" required value={authEmail} onChange={e=>setAuthEmail(e.target.value)}/></label><label>Passwort<input type="password" minLength="8" required value={authPassword} onChange={e=>setAuthPassword(e.target.value)}/></label><button className="btn btn-primary full" disabled={busy}>{busy?"Einen Moment …":authMode==="login"?"Anmelden":"Konto erstellen"}</button><button type="button" className="text-button" onClick={()=>setAuthMode(authMode==="login"?"register":"login")}>{authMode==="login"?"Noch kein Konto? Registrieren":"Schon ein Konto? Anmelden"}</button></form></div>}
   </div>;
 
@@ -237,8 +272,8 @@ function RecipeCard({recipe:r,onEdit,onDelete}){
   return <article className="recipe-card"><div className="recipe-art"><span className="food-emoji">{(r.labels||[]).includes("Fisch")?"🐟":(r.labels||[]).includes("Vegetarisch")?"🥗":(r.labels||[]).includes("Süßspeise")?"🍰":(r.labels||[]).includes("Fleisch")?"🍲":"🍴"}</span><div className="card-actions"><button title="Bearbeiten" onClick={onEdit}><Pencil size={15}/></button><button title="Löschen" onClick={onDelete}><Trash2 size={15}/></button></div></div><div className="recipe-body"><div className="recipe-tags">{(r.labels||[]).map(l=><span key={l} className={`tag tag-${l.toLowerCase()}`}>{l}</span>)}</div><h3>{r.name}</h3><div className="recipe-meta"><span><Clock3 size={14}/>{r.minutes||"–"} Min.</span><span><Users size={14}/>{r.servings||"–"} Portionen</span></div><div className="last-cooked">{cooked?<><History size={14}/> Zuletzt vor {days} Tagen gekocht</>:<><History size={14}/> Noch nicht gekocht</>}</div></div></article>
 }
 function Empty({title,text}){return <div className="empty"><div><BookOpen size={25}/></div><b>{title}</b><p>{text}</p></div>}
-function RecipeModal({form,setForm,editing,onClose,onSave}){
+function RecipeModal({form,setForm,labels,editing,onClose,onSave}){
   const toggle=l=>setForm(f=>({...f,labels:f.labels.includes(l)?f.labels.filter(x=>x!==l):[...f.labels,l]}));
-  return <div className="overlay" onMouseDown={e=>e.target===e.currentTarget&&onClose()}><form className="recipe-modal" onSubmit={e=>{e.preventDefault();onSave(form)}}><div className="modal-head"><div><div className="eyebrow">REZEPTSAMMLUNG</div><h2>{editing?"Rezept bearbeiten":"Neues Rezept"}</h2></div><button type="button" className="close" onClick={onClose}><X/></button></div><div className="form-scroll"><label>Gerichtname *<input required autoFocus placeholder="z. B. Gemüse-Lasagne" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></label><div className="form-row"><label>Zubereitungszeit (Min.)<input type="number" min="1" value={form.minutes} onChange={e=>setForm({...form,minutes:e.target.value})}/></label><label>Portionen<input type="number" min="1" value={form.servings} onChange={e=>setForm({...form,servings:e.target.value})}/></label></div><label>Zutaten<textarea rows="4" placeholder={"Zutat 1\nZutat 2\nZutat 3"} value={form.ingredients} onChange={e=>setForm({...form,ingredients:e.target.value})}/></label><label>Zubereitung<textarea rows="5" placeholder="Wie wird das Gericht zubereitet?" value={form.instructions} onChange={e=>setForm({...form,instructions:e.target.value})}/></label><div className="label-field"><b>Labels auswählen</b><p>Mehrere Labels pro Gericht möglich.</p><div className="label-options">{LABELS.map(l=><button type="button" key={l} className={form.labels.includes(l)?"label-option selected":"label-option"} onClick={()=>toggle(l)}>{form.labels.includes(l)&&<Check size={13}/>} {l}</button>)}</div></div></div><div className="modal-foot"><button type="button" className="btn btn-light" onClick={onClose}>Abbrechen</button><button className="btn btn-primary"><Check size={16}/> {editing?"Änderungen speichern":"Rezept speichern"}</button></div></form></div>
+  return <div className="overlay" onMouseDown={e=>e.target===e.currentTarget&&onClose()}><form className="recipe-modal" onSubmit={e=>{e.preventDefault();onSave(form)}}><div className="modal-head"><div><div className="eyebrow">REZEPTSAMMLUNG</div><h2>{editing?"Rezept bearbeiten":"Neues Rezept"}</h2></div><button type="button" className="close" onClick={onClose}><X/></button></div><div className="form-scroll"><label>Gerichtname *<input required autoFocus placeholder="z. B. Gemüse-Lasagne" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></label><div className="form-row"><label>Zubereitungszeit (Min.)<input type="number" min="1" value={form.minutes} onChange={e=>setForm({...form,minutes:e.target.value})}/></label><label>Portionen<input type="number" min="1" value={form.servings} onChange={e=>setForm({...form,servings:e.target.value})}/></label></div><label>Zutaten<textarea rows="4" placeholder={"Zutat 1\nZutat 2\nZutat 3"} value={form.ingredients} onChange={e=>setForm({...form,ingredients:e.target.value})}/></label><label>Zubereitung<textarea rows="5" placeholder="Wie wird das Gericht zubereitet?" value={form.instructions} onChange={e=>setForm({...form,instructions:e.target.value})}/></label><div className="label-field"><b>Labels auswählen</b><p>Mehrere Labels pro Gericht möglich.</p><div className="label-options">{labels.map(l=><button type="button" key={l} className={form.labels.includes(l)?"label-option selected":"label-option"} onClick={()=>toggle(l)}>{form.labels.includes(l)&&<Check size={13}/>} {l}</button>)}</div></div></div><div className="modal-foot"><button type="button" className="btn btn-light" onClick={onClose}>Abbrechen</button><button className="btn btn-primary"><Check size={16}/> {editing?"Änderungen speichern":"Rezept speichern"}</button></div></form></div>
 }
 export default App;

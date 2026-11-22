@@ -32,6 +32,7 @@ jobs:
           VITE_APPWRITE_PLANS_COLLECTION_ID: ${{ vars.VITE_APPWRITE_PLANS_COLLECTION_ID }}
           VITE_APPWRITE_HISTORY_COLLECTION_ID: ${{ vars.VITE_APPWRITE_HISTORY_COLLECTION_ID }}
           VITE_APPWRITE_TEAM_ID: ${{ vars.VITE_APPWRITE_TEAM_ID }}
+          VITE_APPWRITE_LABELS_COLLECTION_ID: ${{ vars.VITE_APPWRITE_LABELS_COLLECTION_ID }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
